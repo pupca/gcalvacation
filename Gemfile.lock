@@ -6,11 +6,16 @@ GEM
     activesupport (3.0.0)
     addressable (2.3.2)
     awesome_print (1.1.0)
+    fast_xs (0.8.0)
     google_calendar (0.2.7)
       addressable (>= 2.2.2)
       nokogiri (>= 1.4.4)
     i18n (0.6.1)
     nokogiri (1.5.6)
+    rubyzip (0.9.9)
+    simple_xlsx_writer (0.5.3)
+      fast_xs (>= 0.7.3)
+      rubyzip (>= 0.9.4)
 
 PLATFORMS
   ruby
@@ -20,3 +25,4 @@ DEPENDENCIES
   awesome_print
   google_calendar
   i18n
+  simple_xlsx_writer
