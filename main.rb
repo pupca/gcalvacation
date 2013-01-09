@@ -1,44 +1,14 @@
+#http://spreadsheet.rubyforge.org/index.html
 require 'rubygems'
 require 'active_support/all'
 require 'awesome_print'
 require 'google_calendar'
 require 'simple_xlsx'
-
-def public_holidays
-  holidays = []
-  #2012
-  holidays << Date.new(2012,1,1)
-  holidays << Date.new(2012,4,8)
-  holidays << Date.new(2012,4,9)
-  holidays << Date.new(2012,5,1)
-  holidays << Date.new(2012,5,8)
-  holidays << Date.new(2012,7,5)
-  holidays << Date.new(2012,7,6)
-  holidays << Date.new(2012,9,28)
-  holidays << Date.new(2012,10,28)
-  holidays << Date.new(2012,11,17)
-  holidays << Date.new(2012,12,24)
-  holidays << Date.new(2012,12,25)
-  holidays << Date.new(2012,12,26)
-  #2013
-  holidays << Date.new(2013,1,1)
-  holidays << Date.new(2013,4,1)
-  holidays << Date.new(2013,5,1)
-  holidays << Date.new(2013,5,8)
-  holidays << Date.new(2013,7,5)
-  holidays << Date.new(2013,7,6)
-  holidays << Date.new(2013,9,28)
-  holidays << Date.new(2013,10,28)
-  holidays << Date.new(2013,11,17)
-  holidays << Date.new(2013,12,24)
-  holidays << Date.new(2013,12,25)
-  holidays << Date.new(2013,12,26)
-  return holidays
-end
-
+require './config.rb'
 
 $OFFLINE = false
 year = ARGV[3].to_i
+users = get_users
 
 def is_public_holiday?(day)
   return true if public_holidays.include?(day)
@@ -55,6 +25,11 @@ end
 
 def full_days(event)
   (Time.parse(event.end_time) - Time.parse(event.start_time)).to_i % (24 * 60 * 60) == 0
+end
+
+def id_from_name(name)
+  name = name.split(" ")
+  return name[1] + name[0][0]
 end
 
 def get_events(year)
@@ -74,6 +49,7 @@ days = {}
 out_events = []
 events = get_events(year).group_by{|event| event.title.mb_chars.normalize(:kd).gsub(/[^\x00-\x7F]/,'').downcase.split(" ").collect{|element| element.gsub(/\W+/, '')}[0..1].join(" ")}
 events.each do |name, name_events|
+  next if users[id_from_name(name)].nil?
   days[name] = Hash.new(0)
   name_events.each do |event|
     total_days = 0
@@ -99,18 +75,26 @@ events.each do |name, name_events|
   end
 end
 
-File.delete("result.xlsx") if File.exist?("result.xlsx")
+File.delete("vacation_#{year}.xlsx") if File.exist?("vacation_#{year}.xlsx")
   
-serializer = SimpleXlsx::Serializer.new("result.xlsx") do |doc|
+serializer = SimpleXlsx::Serializer.new("vacation_#{year}.xlsx") do |doc|
   doc.add_sheet("Vacation Summary") do |sheet|
-    sheet.add_row(%w{Name January February March April May June July August September October November December Total})
+    sheet.add_row(["Name", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December", "Used", "Availible", "Extra Work", "From #{year -1}", "Remaining"])
     Hash[days.sort].each do |key, value|
       row = []
       row << key.split(' ').map {|w| w.capitalize }.join(' ')
       12.times do |i|
         row << value[i+1]
       end
-      row << value.inject(0) { |sum, tuple| sum += tuple[1] }
+      used = value.inject(0) { |sum, tuple| sum += tuple[1] }
+      row << used
+      availible = users[id_from_name(key)][:vacation_per_year][year.to_s]
+      row << availible
+      extra_work = users[id_from_name(key)][:extra_work][year.to_s]
+      row << extra_work
+      from_last_year = users[id_from_name(key)][:remaining_vacation_from][(year - 1).to_s]
+      row << from_last_year
+      row << (availible.to_f + from_last_year.to_f + extra_work.to_f) - used.to_f
       sheet.add_row(row)
     end
 
